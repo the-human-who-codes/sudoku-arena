@@ -1,0 +1,10 @@
+# Build output
+build/
+web/dist/
+web/src/engine/generated/
+
+# Dependencies and tooling
+node_modules/
+.firebase/
+*.log
+.DS_Store

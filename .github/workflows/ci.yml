@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  EMSDK_VERSION: 6.0.12
+
+jobs:
+  engine:
+    name: C++ engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S engine -B build/native -DCMAKE_BUILD_TYPE=Release -DSUDOKU_WERROR=ON
+      - name: Build
+        run: cmake --build build/native --parallel
+      - name: Test
+        run: ctest --test-dir build/native --output-on-failure
+
+  web:
+    name: WebAssembly build, web app and deploy
+    needs: engine
+    runs-on: ubuntu-latest
+    env:
+      # Deploys need the service-account secret (see README > Deploying); skipped until it exists.
+      HAS_CREDENTIALS: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUDOKU_ARENA_APP != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Emscripten
+        uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}-${{ runner.os }}
+      - name: Set up Emscripten
+        run: |
+          if [ ! -x "$HOME/emsdk/emsdk" ]; then
+            git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          fi
+          "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
+          echo "EMSDK=$HOME/emsdk" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: Build (C++ → WebAssembly, typecheck, bundle)
+        run: npm run build
+        working-directory: web
+      - name: Test (game logic, replay, WebAssembly engine)
+        run: npm test
+        working-directory: web
+      - name: Deploy to Firebase Hosting
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.HAS_CREDENTIALS == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SUDOKU_ARENA_APP }}
+          channelId: live
+          projectId: sudoku-arena-app
+      - name: Deploy skipped
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.HAS_CREDENTIALS != 'true'
+        run: echo "::notice::FIREBASE_SERVICE_ACCOUNT_SUDOKU_ARENA_APP is not set; skipping deploy."

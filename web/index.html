@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sudoku Arena · a C++ Sudoku engine, visualised</title>
+    <meta
+      name="description"
+      content="Watch a C++ Sudoku engine, compiled to WebAssembly, solve puzzles step by step with human logic, constraint propagation, Dancing Links and naive backtracking. Then play its puzzles."
+    />
+    <meta name="theme-color" content="#0d0d0d" />
+    <meta property="og:title" content="Sudoku Arena" />
+    <meta property="og:description" content="A C++ Sudoku engine running in your browser: watch four algorithms think, then play." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Pick the theme before first paint: saved choice, else the OS setting.
+      try {
+        const saved = localStorage.getItem('sudoku-arena:theme');
+        const dark = saved ? saved === 'dark' : !matchMedia('(prefers-color-scheme: light)').matches;
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>Sudoku Arena needs JavaScript and WebAssembly.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
